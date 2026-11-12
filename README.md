@@ -1,3 +1,7 @@
+## This fork ##
+
+Unofficial build of Hacker's Keyboard with two additions: the mic key works with any voice input method, such as FUTO Voice Input ([upstream PR #998](https://github.com/klausw/hackerskeyboard/pull/998)), and settings plus learned words can be exported and imported. It is signed with a personal key, not upstream's, so it cannot update an official install. Download it and read how to switch over in the [latest release](https://github.com/Bluscream/hackerskeyboard/releases/latest).
+
 ## Overview ##
 
 **WARNING:** *This is a rather ancient project that was originally developed back in 2011 based on the Android 2.3 (Gingerbread) AOSP keyboard. While it still works as-is for many users, it would need some major rewrites to work with newer APIs, and some features such as language switching or popup keys don't work right on modern Android systems. I'm not currently planning on significant updates, and it's possible that it will stop working on modern devices or will no longer be updateable via the Google Play store due to minimum API level requirements. Play Store requires targeting API level 29 (Android 10), while the code was written for API level 9 (Android 2.3) from 2011.*
