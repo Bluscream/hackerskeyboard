@@ -1,3 +1,15 @@
+## Bluscream fork ##
+
+A personal fork of Hacker's Keyboard with fixes for current Android: the mic key works with **any** voice input method (e.g. FUTO Voice Input), not only Google's ([upstream PR #998](https://github.com/klausw/hackerskeyboard/pull/998)), plus settings export/import.
+
+- **Downloads:** [Releases](https://github.com/Bluscream/hackerskeyboard/releases). These are personal builds signed with a personal key, not upstream's, so you have to uninstall the Play/F-Droid version first, which wipes its settings.
+- **Source:** branch [`voice-any-ime`](https://github.com/Bluscream/hackerskeyboard/tree/voice-any-ime).
+- **Prefer HeliBoard?** [heliboard-hackerskeyboard-layout](https://github.com/Bluscream/heliboard-hackerskeyboard-layout) recreates this keyboard's German 5-row layout and transparent theme in [HeliBoard](https://github.com/HeliBorg/HeliBoard), with an optional [patched HeliBoard build](https://github.com/Bluscream/HeliBoard/releases/tag/hk-overlay-1) for overlay mode and glowing labels.
+
+The original README follows.
+
+---
+
 ## Overview ##
 
 **WARNING:** *This is a rather ancient project that was originally developed back in 2011 based on the Android 2.3 (Gingerbread) AOSP keyboard. While it still works as-is for many users, it would need some major rewrites to work with newer APIs, and some features such as language switching or popup keys don't work right on modern Android systems. I'm not currently planning on significant updates, and it's possible that it will stop working on modern devices or will no longer be updateable via the Google Play store due to minimum API level requirements. Play Store requires targeting API level 29 (Android 10), while the code was written for API level 9 (Android 2.3) from 2011.*
