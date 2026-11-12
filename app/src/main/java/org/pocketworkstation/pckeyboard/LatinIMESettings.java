@@ -16,26 +16,42 @@
 
 package org.pocketworkstation.pckeyboard;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
+
+import org.json.JSONException;
 
 import android.app.Dialog;
 import android.app.backup.BackupManager;
+import android.content.ActivityNotFoundException;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.Signature;
 import android.content.res.Resources;
+import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Process;
 import android.preference.CheckBoxPreference;
 import android.preference.ListPreference;
 import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceGroup;
+import android.preference.PreferenceScreen;
 import android.text.AutoText;
 import android.text.InputType;
 import android.util.Log;
+import android.widget.Toast;
 
 public class LatinIMESettings extends PreferenceActivity
         implements SharedPreferences.OnSharedPreferenceChangeListener,
@@ -46,11 +62,21 @@ public class LatinIMESettings extends PreferenceActivity
     private static final String VOICE_SETTINGS_KEY = "voice_mode";
     /* package */ static final String PREF_SETTINGS_KEY = "settings_key";
     static final String INPUT_CONNECTION_INFO = "input_connection_info";    
+    private static final String BACKUP_SETTINGS_KEY = "backup_settings";
+    private static final String EXPORT_SETTINGS_KEY = "export_settings";
+    private static final String IMPORT_SETTINGS_KEY = "import_settings";
 
     private static final String TAG = "LatinIMESettings";
 
     // Dialog ids
     private static final int VOICE_INPUT_CONFIRM_DIALOG = 0;
+
+    // Activity request codes
+    private static final int EXPORT_SETTINGS_REQUEST = 1;
+    private static final int IMPORT_SETTINGS_REQUEST = 2;
+
+    // Leaves time for the import result toast before the process restarts.
+    private static final int IMPORT_RESTART_DELAY_MS = 2000;
 
     private CheckBoxPreference mQuickFixes;
     private ListPreference mVoicePreference;
@@ -74,7 +100,10 @@ public class LatinIMESettings extends PreferenceActivity
         mSettingsKeyPreference = (ListPreference) findPreference(PREF_SETTINGS_KEY);
         mInputConnectionInfo = (Preference) findPreference(INPUT_CONNECTION_INFO);
         mLabelVersion = (Preference) findPreference("label_version");
-
+        // Export and import use the Storage Access Framework.
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.KITKAT) {
+            getPreferenceScreen().removePreference(findPreference(BACKUP_SETTINGS_KEY));
+        }
 
         // TODO(klausw): remove these when no longer needed
         mKeyboardModePortraitPreference = (ListPreference) findPreference("pref_keyboard_mode_portrait");
@@ -157,6 +186,94 @@ public class LatinIMESettings extends PreferenceActivity
         mVoiceOn = !(prefs.getString(VOICE_SETTINGS_KEY, mVoiceModeOff).equals(mVoiceModeOff));
         updateVoiceModeSummary();
         updateSummaries();
+    }
+
+    @Override
+    public boolean onPreferenceTreeClick(PreferenceScreen screen, Preference preference) {
+        String key = preference.getKey();
+        Intent intent;
+        int requestCode;
+        if (EXPORT_SETTINGS_KEY.equals(key)) {
+            String date = new SimpleDateFormat("yyyyMMdd", Locale.US).format(new Date());
+            intent = new Intent(Intent.ACTION_CREATE_DOCUMENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("application/zip")
+                    .putExtra(Intent.EXTRA_TITLE, "hackerskeyboard-settings-" + date + ".zip");
+            requestCode = EXPORT_SETTINGS_REQUEST;
+        } else if (IMPORT_SETTINGS_KEY.equals(key)) {
+            intent = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                    .addCategory(Intent.CATEGORY_OPENABLE)
+                    .setType("*/*");
+            requestCode = IMPORT_SETTINGS_REQUEST;
+        } else {
+            return super.onPreferenceTreeClick(screen, preference);
+        }
+        try {
+            startActivityForResult(intent, requestCode);
+        } catch (ActivityNotFoundException e) {
+            Log.e(TAG, "No document picker", e);
+            Toast.makeText(this, getString(requestCode == EXPORT_SETTINGS_REQUEST
+                    ? R.string.export_settings_failed : R.string.import_settings_failed,
+                    e.getMessage()), Toast.LENGTH_LONG).show();
+        }
+        return true;
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        if (requestCode == EXPORT_SETTINGS_REQUEST) {
+            exportSettings(data.getData());
+        } else if (requestCode == IMPORT_SETTINGS_REQUEST) {
+            importSettings(data.getData());
+        }
+    }
+
+    private void exportSettings(Uri uri) {
+        try {
+            OutputStream out = getContentResolver().openOutputStream(uri);
+            try {
+                SettingsBackup.exportTo(this, out);
+            } finally {
+                out.close();
+            }
+        } catch (IOException | JSONException | SecurityException e) {
+            Log.e(TAG, "Settings export failed", e);
+            Toast.makeText(this, getString(R.string.export_settings_failed, e.getMessage()),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this, R.string.export_settings_done, Toast.LENGTH_SHORT).show();
+    }
+
+    private void importSettings(Uri uri) {
+        SharedPreferences prefs = getPreferenceManager().getSharedPreferences();
+        // This screen would otherwise react to every replaced value.
+        prefs.unregisterOnSharedPreferenceChangeListener(this);
+        try {
+            InputStream in = getContentResolver().openInputStream(uri);
+            try {
+                SettingsBackup.importFrom(this, in);
+            } finally {
+                in.close();
+            }
+        } catch (IOException | JSONException | SecurityException e) {
+            Log.e(TAG, "Settings import failed", e);
+            prefs.registerOnSharedPreferenceChangeListener(this);
+            Toast.makeText(this, getString(R.string.import_settings_failed, e.getMessage()),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        Toast.makeText(this, R.string.import_settings_done, Toast.LENGTH_LONG).show();
+        finish();
+        // The keyboard caches settings in memory and keeps the dictionary
+        // databases open, so restart the process to load the imported state.
+        // The system rebinds the input method service on its own.
+        new Handler().postDelayed(new Runnable() {
+            public void run() {
+                Process.killProcess(Process.myPid());
+            }
+        }, IMPORT_RESTART_DELAY_MS);
     }
 
     static Map<Integer, String> INPUT_CLASSES = new HashMap<Integer, String>();

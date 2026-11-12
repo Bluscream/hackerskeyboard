@@ -678,4 +678,14 @@
     <string name="notification_channel_name">Hacker\'s Keyboard</string>
     <string name="notification_channel_description">Hacker\'s Keyboard</string>
     <string name="notification_action_settings">Settings</string>
+
+    <string name="title_backup_category">Backup</string>
+    <string name="title_export_settings">Export settings</string>
+    <string name="summary_export_settings">Save all settings and learned words to a file</string>
+    <string name="title_import_settings">Import settings</string>
+    <string name="summary_import_settings">Replace all settings and learned words from an exported file</string>
+    <string name="export_settings_done">Settings exported.</string>
+    <string name="export_settings_failed">Could not export settings: %s</string>
+    <string name="import_settings_done">Settings imported. The keyboard is restarting.</string>
+    <string name="import_settings_failed">Could not import settings: %s</string>
 </resources>
